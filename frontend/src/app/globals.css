@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+/* ─── WSJ Newspaper Theme ─── */
+:root {
+  /* Build-safe font vars (no Google Fonts fetch during docker build) */
+  --font-geist-sans: "Inter";
+  --font-geist-mono: "IBM Plex Mono";
+  --font-display: "Playfair Display";
+  --font-serif: "Libre Baskerville";
+  --font-mono-data: "IBM Plex Mono";
+  --font-sans-label: "Inter";
+
+  --wsj-bg: #e8e0d0;
+  --wsj-white: #f5f0e8;
+  --wsj-ink: #1a1a1a;
+  --wsj-grey: #c8c8c8;
+  --wsj-grey-light: #d8d0c4;
+  --wsj-blue: #8a8a8a;
+  --wsj-red: #b07050;
+  --wsj-green: #c9a96e;
+  --wsj-gain: #2e7d32;
+  --wsj-loss: #c62828;
+  --wsj-link: #1565c0;
+  --wsj-text: #555555;
+  --wsj-muted: #888888;
+
+  --wsj-footer-bg: #1a1a1a;
+  --wsj-footer-text: rgba(245,240,232,0.6);
+  --wsj-footer-muted: rgba(245,240,232,0.4);
+  --wsj-footer-faint: rgba(245,240,232,0.3);
+  --wsj-footer-rule: rgba(245,240,232,0.15);
+  --wsj-footer-rule2: rgba(245,240,232,0.1);
+  --wsj-footer-label: rgba(245,240,232,0.55);
+  --wsj-footer-border-top: none;
+
+  --background: #e8e0d0;
+  --foreground: #1a1a1a;
+}
+
+/* ─── Dark Mode ─── */
+.dark {
+  --wsj-bg: #121212;
+  --wsj-white: #1a1a1a;
+  --wsj-ink: #e0ddd5;
+  --wsj-grey: #333333;
+  --wsj-grey-light: #2a2a2a;
+  --wsj-blue: #9a9a9a;
+  --wsj-red: #d49070;
+  --wsj-green: #c9a96e;
+  --wsj-gain: #4caf50;
+  --wsj-loss: #ef5350;
+  --wsj-link: #64b5f6;
+  --wsj-text: #b0b0b0;
+  --wsj-muted: #777777;
+
+  --wsj-footer-bg: #111111;
+  --wsj-footer-text: rgba(224,221,213,0.75);
+  --wsj-footer-muted: rgba(224,221,213,0.5);
+  --wsj-footer-faint: rgba(224,221,213,0.4);
+  --wsj-footer-rule: rgba(224,221,213,0.25);
+  --wsj-footer-rule2: rgba(224,221,213,0.15);
+  --wsj-footer-label: rgba(224,221,213,0.6);
+  --wsj-footer-border-top: 1px solid #333333;
+
+  --background: #121212;
+  --foreground: #e0ddd5;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans-label);
+  --font-mono: var(--font-mono-data);
+
+  /* WSJ surface & text tokens */
+  --color-wsj-bg: #e8e0d0;
+  --color-wsj-white: #f5f0e8;
+  --color-wsj-ink: #1a1a1a;
+  --color-wsj-grey: #c8c8c8;
+  --color-wsj-grey-light: #d8d0c4;
+  --color-wsj-text: #555555;
+  --color-wsj-muted: #888888;
+
+  /* Semantic */
+  --color-wsj-blue: #8a8a8a;
+  --color-wsj-green: #c9a96e;
+  --color-wsj-red: #b07050;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-serif), 'Georgia', 'Times New Roman', serif;
+}
+
+/* ─── LaTeX equation ticker scroll ─── */
+@keyframes scrollEqs {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ─── Market ticker ribbon scroll ─── */
+@keyframes scrollTicker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Tone down KaTeX to match newspaper feel */
+.katex {
+  font-size: 1em !important;
+}
+
+/* ─── Newspaper spread: CSS multi-column flow layout ─── */
+.spread-flow .spread-item {
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  margin-bottom: 1rem;
+}
+.spread-flow .spread-span {
+  column-span: all;
+  margin-bottom: 1rem;
+}
+
+/* Hide scrollbar but keep scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }

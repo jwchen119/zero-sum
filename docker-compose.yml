@@ -1,0 +1,61 @@
+services:
+  backend:
+    build: /volume2/docker/zs/backend
+    container_name: zero-sum-backend
+    env_file:
+      - .env
+    ports:
+      - "5215:5000"
+    environment:
+      - CACHE_TTL_SECONDS=14400
+      - TZ=Asia/Taipei
+    volumes:
+      - /volume2/docker/zs/data/cache:/app/cache:rw
+      - /volume2/docker/zs/data/static_analysis:/app/static_analysis:rw
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 6s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  scheduler:
+    build: /volume2/docker/zs/backend
+    container_name: zero-sum-scheduler
+    env_file:
+      - .env
+    command: ["python", "scheduler.py"]
+    environment:
+      - TZ=Asia/Taipei
+      - TIER1_MARKET_OPEN_SEC=300
+      - TIER1_MARKET_CLOSED_SEC=1800
+      - TIER2_INTERVAL_SEC=14400
+      - BATCH_DELAY=1.0
+      - BATCH_TTL_HOURS=20
+      - BATCH_PRICE_SIZE=10
+      - BATCH_WORKERS=3
+    volumes:
+      - /volume2/docker/zs/data/cache:/app/cache:rw
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: /volume2/docker/zs/frontend
+      args:
+        BACKEND_URL: http://backend:5000
+    container_name: zero-sum-frontend
+    ports:
+      - "3862:3000"
+    environment:
+      - BACKEND_URL=http://backend:5000
+      - TZ=Asia/Taipei
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+# Data is bind-mounted to ./data/ on the host for persistence.
+# Back up ./data/ to preserve cache across re-deploys.

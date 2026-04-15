@@ -1,0 +1,15 @@
+flask>=3.1,<4
+flask-cors>=0.0.1
+flask-limiter>=3.5
+python-dotenv>=1.0
+yfinance>=0.2
+pandas>=2.0
+numpy>=1.24
+openai>=1.0
+gunicorn>=22.0
+requests>=2.31
+matplotlib>=3.7
+mplfinance>=0.12.0a0
+lxml>=5.0
+feedparser>=6.0
+trafilatura>=1.0

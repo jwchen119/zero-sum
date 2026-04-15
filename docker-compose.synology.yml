@@ -1,0 +1,72 @@
+services:
+  backend:
+    image: ghcr.io/jwchen119/zero-sum-backend:latest
+    container_name: zero-sum-backend
+    ports:
+      - "5215:5000"
+    environment:
+      - CACHE_TTL_SECONDS=${CACHE_TTL_SECONDS:-14400}
+      - TZ=${TZ:-Asia/Taipei}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_ORG_ID=${OPENAI_ORG_ID:-}
+      - ANALYSIS_MODEL=${ANALYSIS_MODEL:-gpt-4o}
+      - ANALYSIS_CACHE_HOURS=${ANALYSIS_CACHE_HOURS:-24}
+      - ENABLE_CONGRESS_TRADES=${ENABLE_CONGRESS_TRADES:-0}
+      - YF_DOWNLOAD_THREADS=${YF_DOWNLOAD_THREADS:-3}
+      - YF_DOWNLOAD_RETRIES=${YF_DOWNLOAD_RETRIES:-2}
+      - YF_DOWNLOAD_TIMEOUT_SEC=${YF_DOWNLOAD_TIMEOUT_SEC:-20}
+      # Optional:
+      # - OPENAI_API_KEY=sk-...
+      # - OPENAI_ORG_ID=org-...
+      # - ANALYSIS_MODEL=gpt-4o
+      # - ANALYSIS_CACHE_HOURS=24
+    volumes:
+      - ./data/cache:/app/cache:rw
+      - ./data/static_analysis:/app/static_analysis:rw
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 6s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  scheduler:
+    image: ghcr.io/jwchen119/zero-sum-backend:latest
+    container_name: zero-sum-scheduler
+    command: ["python", "scheduler.py"]
+    environment:
+      - TZ=${TZ:-Asia/Taipei}
+      - TIER1_MARKET_OPEN_SEC=${TIER1_MARKET_OPEN_SEC:-300}
+      - TIER1_MARKET_CLOSED_SEC=${TIER1_MARKET_CLOSED_SEC:-1800}
+      - TIER2_INTERVAL_SEC=${TIER2_INTERVAL_SEC:-14400}
+      - BATCH_DELAY=${BATCH_DELAY:-1.0}
+      - BATCH_TTL_HOURS=${BATCH_TTL_HOURS:-20}
+      - BATCH_PRICE_SIZE=${BATCH_PRICE_SIZE:-10}
+      - BATCH_WORKERS=${BATCH_WORKERS:-3}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_ORG_ID=${OPENAI_ORG_ID:-}
+      - ANALYSIS_MODEL=${ANALYSIS_MODEL:-gpt-4o}
+      - ANALYSIS_CACHE_HOURS=${ANALYSIS_CACHE_HOURS:-24}
+      - ENABLE_CONGRESS_TRADES=${ENABLE_CONGRESS_TRADES:-0}
+      - YF_DOWNLOAD_THREADS=${YF_DOWNLOAD_THREADS:-3}
+      - YF_DOWNLOAD_RETRIES=${YF_DOWNLOAD_RETRIES:-2}
+      - YF_DOWNLOAD_TIMEOUT_SEC=${YF_DOWNLOAD_TIMEOUT_SEC:-20}
+    volumes:
+      - ./data/cache:/app/cache:rw
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/jwchen119/zero-sum-frontend:latest
+    container_name: zero-sum-frontend
+    ports:
+      - "3862:3000"
+    environment:
+      - BACKEND_URL=${BACKEND_URL:-http://backend:5000}
+      - TZ=${TZ:-Asia/Taipei}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
