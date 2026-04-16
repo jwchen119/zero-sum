@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import WSJLayout from "@/components/WSJLayout";
 import { formatCurrency } from "@/lib/format";
+import { getInitialCompareTickers } from "./compareDefaults";
 import {
-  WHT, INK, GRY, BLU, RED, T2, TM, BG, GAIN, LOSS,
+  WHT, INK, GRY, RED, T2, TM, BG, GAIN, LOSS,
   serif, mono, sans,
-  Hair, WSJSection,
+  WSJSection,
 } from "@/lib/wsj";
 import { fetchCompare, type CompareResponse } from "@/lib/api";
 
@@ -677,13 +678,14 @@ function HexDensityPlot({ data }: { data: CompareResponse }) {
   const [selectedPair, setSelectedPair] = useState(0);
   const [hoverHex, setHoverHex] = useState<{ bin: string; count: number; cx: number; cy: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-
-  if (pairs.length === 0) return null;
-
-  const [tA, tB] = pairs[selectedPair];
+  const selected = pairs[selectedPair] ?? null;
+  const tA = selected?.[0];
+  const tB = selected?.[1];
 
   // Compute aligned daily returns
   const dailyReturns = useMemo(() => {
+    if (!tA || !tB) return [];
+
     const pricesA = data.prices[tA] || [];
     const pricesB = data.prices[tB] || [];
     // Build date→close maps
@@ -725,8 +727,6 @@ function HexDensityPlot({ data }: { data: CompareResponse }) {
 
   // Hexagonal binning
   const hexSize = 12;
-  const hexW = hexSize * 2;
-  const hexH = Math.sqrt(3) * hexSize;
 
   const bins = new Map<string, { cx: number; cy: number; count: number }>();
   for (const pt of dailyReturns) {
@@ -736,7 +736,9 @@ function HexDensityPlot({ data }: { data: CompareResponse }) {
     const q = ((2 / 3) * (sx - padL)) / hexSize;
     const r = ((-1 / 3) * (sx - padL) + (Math.sqrt(3) / 3) * (sy - padT)) / hexSize;
     // Cube round
-    let rx = Math.round(q), ry = Math.round(r), rz = Math.round(-q - r);
+    let rx = Math.round(q);
+    let ry = Math.round(r);
+    const rz = Math.round(-q - r);
     const dx = Math.abs(rx - q), dy = Math.abs(ry - r), dz = Math.abs(rz - (-q - r));
     if (dx > dy && dx > dz) rx = -ry - rz;
     else if (dy > dz) ry = -rx - rz;
@@ -771,6 +773,8 @@ function HexDensityPlot({ data }: { data: CompareResponse }) {
   for (let v = -tickStep * 4; v <= tickStep * 4; v += tickStep) {
     if (v >= minX && v <= maxX) ticks.push(v);
   }
+
+  if (!tA || !tB || dailyReturns.length < 5) return null;
 
   return (
     <div>
@@ -886,27 +890,37 @@ function HexDensityPlot({ data }: { data: CompareResponse }) {
 function ComparePageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const initial = searchParams.get("tickers")?.split(",").filter(Boolean).map((t) => t.trim().toUpperCase()).slice(0, 5) || [];
-  const [tickers, setTickers] = useState<string[]>(initial.length > 0 ? initial : ["AAPL", "MSFT"]);
+  const initial = getInitialCompareTickers(searchParams.get("tickers"));
+  const [tickers, setTickers] = useState<string[]>(initial);
   const [input, setInput] = useState("");
   const [data, setData] = useState<CompareResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const load = useCallback((t: string[]) => {
-    if (t.length < 2) return;
-    setLoading(true);
-    fetchCompare(t)
-      .then(setData)
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
-  }, []);
-
   useEffect(() => {
-    if (tickers.length >= 2) {
-      load(tickers);
-      router.replace(`/compare?tickers=${tickers.join(",")}`, { scroll: false });
-    }
-  }, [tickers, load, router]);
+    if (tickers.length < 2) return;
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      fetchCompare(tickers)
+        .then((result) => {
+          if (!cancelled) setData(result);
+        })
+        .catch(() => {
+          if (!cancelled) setData(null);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 0);
+
+    router.replace(`/compare?tickers=${tickers.join(",")}`, { scroll: false });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [tickers, router]);
 
   const addTicker = (e: React.FormEvent) => {
     e.preventDefault();

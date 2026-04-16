@@ -44,3 +44,6 @@ data/
 frontend/.next/
 frontend/out/
 frontend/next-env.d.ts
+
+# Local git worktrees
+.worktrees/
