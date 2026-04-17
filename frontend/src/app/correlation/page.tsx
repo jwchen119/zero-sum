@@ -4,6 +4,10 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import WSJLayout from "@/components/WSJLayout";
 import {
+  CORRELATION_TICKER_PLACEHOLDER,
+  DEFAULT_CORRELATION_TICKERS,
+} from "./correlationDefaults";
+import {
   WHT, INK, GRY, BLU, RED, T2, TM,
   serif, mono,
   Hair, HeavyRule,
@@ -34,8 +38,6 @@ const PERIODS = [
   { label: "2Y", value: "2y" },
   { label: "5Y", value: "5y" },
 ];
-
-const DEFAULT_TICKERS = "AAPL,MSFT,GOOG,AMZN,NVDA,TSLA";
 
 const PALETTE = [
   "#1565c0", "#c62828", "#2e7d32", "#e65100", "#6a1b9a",
@@ -450,7 +452,7 @@ function HexbinPlot({
 /* ─── Main page ─── */
 
 export default function CorrelationPage() {
-  const [input, setInput] = useState(DEFAULT_TICKERS);
+  const [input, setInput] = useState(DEFAULT_CORRELATION_TICKERS);
   const [period, setPeriod] = useState("1y");
   const [data, setData] = useState<CorrelationResponse | null>(null);
   const [detailed, setDetailed] = useState<CorrelationDetailedResponse | null>(null);
@@ -747,7 +749,7 @@ export default function CorrelationPage() {
               onChange={(e) => setInput(e.target.value)}
               className="w-full border px-3 py-2 text-sm uppercase"
               style={{ borderColor: GRY, background: WHT, fontFamily: mono }}
-              placeholder="AAPL,MSFT,GOOG"
+              placeholder={CORRELATION_TICKER_PLACEHOLDER}
             />
           </div>
           <div className="flex gap-1">
