@@ -4,6 +4,10 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import WSJLayout from "@/components/WSJLayout";
 import {
+  CORRELATION_TICKER_PLACEHOLDER,
+  DEFAULT_CORRELATION_TICKERS,
+} from "./correlationDefaults";
+import {
   WHT, INK, GRY, BLU, RED, T2, TM,
   serif, mono,
   Hair, HeavyRule,
@@ -34,8 +38,6 @@ const PERIODS = [
   { label: "2Y", value: "2y" },
   { label: "5Y", value: "5y" },
 ];
-
-const DEFAULT_TICKERS = "AAPL,MSFT,GOOG,AMZN,NVDA,TSLA";
 
 const PALETTE = [
   "#1565c0", "#c62828", "#2e7d32", "#e65100", "#6a1b9a",
@@ -299,10 +301,14 @@ function HexbinPlot({
   const margin = isSmall
     ? { top: 10, right: 10, bottom: 40, left: 40 }
     : { top: 15, right: 20, bottom: 50, left: 55 };
-  const { bins, maxCount, xMin, xMax, yMin, yMax } = useMemo(
-    () => hexBinData(data, width, height, margin, hexR),
-    [data, width, height, hexR],
-  );
+  const { bins, maxCount, xMin, xMax, yMin, yMax } = useMemo(() => {
+    const memoHexR = isSmall ? 10 : 14;
+    const memoMargin = isSmall
+      ? { top: 10, right: 10, bottom: 40, left: 40 }
+      : { top: 15, right: 20, bottom: 50, left: 55 };
+
+    return hexBinData(data, width, height, memoMargin, memoHexR);
+  }, [data, width, height, isSmall]);
 
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
@@ -446,7 +452,7 @@ function HexbinPlot({
 /* ─── Main page ─── */
 
 export default function CorrelationPage() {
-  const [input, setInput] = useState(DEFAULT_TICKERS);
+  const [input, setInput] = useState(DEFAULT_CORRELATION_TICKERS);
   const [period, setPeriod] = useState("1y");
   const [data, setData] = useState<CorrelationResponse | null>(null);
   const [detailed, setDetailed] = useState<CorrelationDetailedResponse | null>(null);
@@ -700,7 +706,6 @@ export default function CorrelationPage() {
       spreads.push({ date: detailed.dates[i], spread: Math.round(s * 100) / 100 });
     }
     const mean = sum / n;
-    for (let i = 0; i < n; i++) spreads[i].spread;
     return spreads.map((d) => ({ ...d, mean: Math.round(mean * 100) / 100 }));
   }, [detailed, spreadPair]);
 
@@ -744,7 +749,7 @@ export default function CorrelationPage() {
               onChange={(e) => setInput(e.target.value)}
               className="w-full border px-3 py-2 text-sm uppercase"
               style={{ borderColor: GRY, background: WHT, fontFamily: mono }}
-              placeholder="AAPL,MSFT,GOOG"
+              placeholder={CORRELATION_TICKER_PLACEHOLDER}
             />
           </div>
           <div className="flex gap-1">
@@ -1087,7 +1092,7 @@ export default function CorrelationPage() {
                 </div>
                 {/* labels for each dot */}
                 <div className="flex flex-wrap justify-center gap-3 mt-1 mb-2">
-                  {riskReturnData.map((d, i) => (
+                  {riskReturnData.map((d) => (
                     <span key={d.ticker} className="text-[10px] font-bold" style={{ fontFamily: mono, color: d.ret >= 0 ? "#2e7d32" : "#c62828" }}>
                       <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ background: d.ret >= 0 ? "#2e7d32" : "#c62828" }} />
                       {d.ticker}
