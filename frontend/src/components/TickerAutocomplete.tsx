@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { fetchTickerList, type TickerInfo } from "@/lib/api";
 
 const mono = "'IBM Plex Mono', 'Courier New', monospace";
@@ -27,7 +27,6 @@ export default function TickerAutocomplete({ onAdd, placeholder = "Add ticker\u2
   const query = controlled ? value : internal;
   const setQuery = controlled ? (v: string) => onChange?.(v) : setInternal;
   const [allTickers, setAllTickers] = useState<TickerInfo[]>([]);
-  const [results, setResults] = useState<TickerInfo[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -38,33 +37,24 @@ export default function TickerAutocomplete({ onAdd, placeholder = "Add ticker\u2
     fetchTickerList().then(setAllTickers).catch(() => {});
   }, []);
 
-  // Filter on query change
-  const updateResults = useCallback(
-    (q: string) => {
-      if (!q) { setResults([]); setOpen(false); return; }
-      const upper = q.toUpperCase();
-      const matches = allTickers
-        .filter(
-          (t) =>
-            t.symbol.startsWith(upper) ||
-            t.name.toUpperCase().includes(upper)
-        )
-        .slice(0, 12);
-      // Put exact symbol-prefix matches first, then name matches
-      matches.sort((a, b) => {
-        const aExact = a.symbol.startsWith(upper) ? 0 : 1;
-        const bExact = b.symbol.startsWith(upper) ? 0 : 1;
-        if (aExact !== bExact) return aExact - bExact;
-        return a.symbol.localeCompare(b.symbol);
-      });
-      setResults(matches);
-      setOpen(matches.length > 0);
-      setActiveIdx(-1);
-    },
-    [allTickers]
-  );
-
-  useEffect(() => { updateResults(query); }, [query, updateResults]);
+  const results = useMemo(() => {
+    if (!query) return [];
+    const upper = query.toUpperCase();
+    const matches = allTickers
+      .filter(
+        (t) =>
+          t.symbol.startsWith(upper) ||
+          t.name.toUpperCase().includes(upper)
+      )
+      .slice(0, 12);
+    matches.sort((a, b) => {
+      const aExact = a.symbol.startsWith(upper) ? 0 : 1;
+      const bExact = b.symbol.startsWith(upper) ? 0 : 1;
+      if (aExact !== bExact) return aExact - bExact;
+      return a.symbol.localeCompare(b.symbol);
+    });
+    return matches;
+  }, [allTickers, query]);
 
   // Close on outside click
   useEffect(() => {
@@ -80,7 +70,15 @@ export default function TickerAutocomplete({ onAdd, placeholder = "Add ticker\u2
   const selectTicker = (symbol: string) => {
     onAdd(symbol);
     if (!controlled) setQuery("");
+    setActiveIdx(-1);
     setOpen(false);
+  };
+
+  const handleChange = (nextValue: string) => {
+    const upper = nextValue.toUpperCase();
+    setQuery(upper);
+    setActiveIdx(-1);
+    setOpen(Boolean(upper.trim()));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -122,7 +120,7 @@ export default function TickerAutocomplete({ onAdd, placeholder = "Add ticker\u2
       <input
         type="text"
         value={query}
-        onChange={(e) => setQuery(e.target.value.toUpperCase())}
+        onChange={(e) => handleChange(e.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={() => query && results.length > 0 && setOpen(true)}
         placeholder={placeholder}

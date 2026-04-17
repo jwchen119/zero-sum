@@ -33,12 +33,20 @@ _SESSION.headers.update({
 
 # TTL for per-ticker news cache: 30 minutes
 _NEWS_TTL = 1800
+_KEYWORD_MAX_LENGTH = 80
 
 
 # ─── Source: Google News RSS ─────────────────────────────
 
-def _fetch_google_news(ticker: str) -> list[dict]:
-    """Fetch recent articles from Google News RSS for a stock ticker."""
+def _fetch_google_news_query(
+    query: str,
+    *,
+    hl: str,
+    gl: str,
+    ceid: str,
+    limit: int = 15,
+) -> list[dict]:
+    """Fetch recent articles from Google News RSS for a free-form query."""
     try:
         import feedparser
     except ImportError:
@@ -47,14 +55,14 @@ def _fetch_google_news(ticker: str) -> list[dict]:
 
     url = (
         f"https://news.google.com/rss/search?"
-        f"q={quote_plus(ticker + ' stock')}&hl=en-US&gl=US&ceid=US:en"
+        f"q={quote_plus(query)}&hl={quote_plus(hl)}&gl={quote_plus(gl)}&ceid={quote_plus(ceid)}"
     )
     try:
         resp = _SESSION.get(url, timeout=10)
         resp.raise_for_status()
         feed = feedparser.parse(resp.text)
         articles = []
-        for entry in feed.entries[:15]:
+        for entry in feed.entries[:limit]:
             pub_date = ""
             if hasattr(entry, "published"):
                 pub_date = entry.published
@@ -79,8 +87,18 @@ def _fetch_google_news(ticker: str) -> list[dict]:
             })
         return articles
     except Exception as exc:
-        logger.warning("Google News fetch failed for %s: %s", ticker, exc)
+        logger.warning("Google News fetch failed for %s (%s/%s): %s", query, hl, gl, exc)
         return []
+
+
+def _fetch_google_news(ticker: str) -> list[dict]:
+    """Fetch recent articles from Google News RSS for a stock ticker."""
+    return _fetch_google_news_query(
+        f"{ticker} stock",
+        hl="en-US",
+        gl="US",
+        ceid="US:en",
+    )
 
 
 # ─── Source: Yahoo Finance RSS ───────────────────────────
@@ -176,6 +194,16 @@ def _merge_news(sources: list[list[dict]]) -> list[dict]:
     return merged[:40]
 
 
+def _validate_keyword_query(keyword: str):
+    """Return (clean_keyword, error_response) — error_response is None if valid."""
+    raw = " ".join((keyword or "").strip().split())
+    if not raw:
+        return raw, (jsonify({"error": "Missing 'keyword' parameter"}), 400)
+    if len(raw) > _KEYWORD_MAX_LENGTH:
+        return raw, (jsonify({"error": f"Keyword must be {_KEYWORD_MAX_LENGTH} characters or fewer"}), 400)
+    return raw, None
+
+
 # ─── API endpoint ────────────────────────────────────────
 
 @news_bp.route("/api/stock-news")
@@ -213,6 +241,58 @@ def api_stock_news():
         "ticker": ticker,
         "articles": articles,
         "sources": ["Google News", "Yahoo RSS", "Yahoo Finance"],
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+
+    _cache_put("stock_news", cache_key, payload)
+    return jsonify(payload)
+
+
+@news_bp.route("/api/stock-news-keyword")
+def api_stock_news_keyword():
+    """Return recent news for a free-form keyword query."""
+    keyword_raw = request.args.get("keyword", "")
+    keyword, err = _validate_keyword_query(keyword_raw)
+    if err:
+        return err
+
+    cache_hash = hashlib.sha256(keyword.casefold().encode("utf-8")).hexdigest()[:16]
+    cache_key = f"keyword_{cache_hash}"
+    cached = _cache_get("stock_news", cache_key, ttl=_NEWS_TTL)
+    if cached is not None:
+        return jsonify(cached)
+
+    results: list[list[dict]] = [[], []]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = {
+            pool.submit(
+                _fetch_google_news_query,
+                keyword,
+                hl="zh-TW",
+                gl="TW",
+                ceid="TW:zh-Hant",
+            ): 0,
+            pool.submit(
+                _fetch_google_news_query,
+                keyword,
+                hl="en-US",
+                gl="US",
+                ceid="US:en",
+            ): 1,
+        }
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                results[idx] = future.result()
+            except Exception as exc:
+                logger.warning("Keyword news source %d failed for %s: %s", idx, keyword, exc)
+
+    articles = _merge_news(results)
+
+    payload = {
+        "query": keyword,
+        "articles": articles,
+        "sources": ["Google News"],
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }
 
