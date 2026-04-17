@@ -13,7 +13,6 @@ import {
   fetchSectorCorrelation,
   fetchSectorValuation,
   type SectorCorrelationResponse,
-  type SectorValuationResponse,
   type SectorValuation,
 } from "@/lib/api";
 
@@ -217,10 +216,14 @@ function HexbinPlot({
   const margin = isSmall
     ? { top: 10, right: 10, bottom: 40, left: 40 }
     : { top: 15, right: 20, bottom: 50, left: 55 };
-  const { bins, maxCount, xMin, xMax, yMin, yMax } = useMemo(
-    () => hexBinData(data, width, height, margin, hexR),
-    [data, width, height, hexR],
-  );
+  const { bins, maxCount, xMin, xMax, yMin, yMax } = useMemo(() => {
+    const memoHexR = isSmall ? 10 : 14;
+    const memoMargin = isSmall
+      ? { top: 10, right: 10, bottom: 40, left: 40 }
+      : { top: 15, right: 20, bottom: 50, left: 55 };
+
+    return hexBinData(data, width, height, memoMargin, memoHexR);
+  }, [data, width, height, isSmall]);
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
   const scaleX = (v: number) => margin.left + (plotW * (v - xMin)) / (xMax - xMin || 1);
@@ -497,11 +500,10 @@ function RiskReturnSVG({ stats }: { stats: SectorCorrelationResponse["stats"] })
    ═══════════════════════════════════════════════════════════ */
 
 function NormalizedPerformanceChart({
-  dailyReturns, sectors, period,
+  dailyReturns, sectors,
 }: {
   dailyReturns: Record<string, number[]>;
   sectors: string[];
-  period: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [cWidth, setCWidth] = useState(700);
@@ -720,7 +722,6 @@ export default function SectorAnalysisPage() {
   const [weighting, setWeighting] = useState<"cap" | "equal">("cap");
   const [corrData, setCorrData] = useState<SectorCorrelationResponse | null>(null);
   const [valData, setValData] = useState<SectorValuation[] | null>(null);
-  const [valMeta, setValMeta] = useState<Omit<SectorValuationResponse, "sectors"> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [hexPair, setHexPair] = useState("");
@@ -737,34 +738,35 @@ export default function SectorAnalysisPage() {
 
   /* fetch data */
   useEffect(() => {
-    setLoading(true);
-    setError("");
-    Promise.all([
-      fetchSectorCorrelation(period, weighting),
-      fetchSectorValuation(),
-    ])
-      .then(([corr, val]) => {
-        setCorrData(corr);
-        setValData(val.sectors);
-        setValMeta({ totalFilesInDataset: val.totalFilesInDataset, totalStocksUsed: val.totalStocksUsed, dataAsOf: val.dataAsOf });
-        if (corr.sectors.length >= 2) {
-          setHexPair(`${corr.sectors[0]}-${corr.sectors[1]}`);
-        }
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
-  }, [period, weighting]);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError("");
+      Promise.all([
+        fetchSectorCorrelation(period, weighting),
+        fetchSectorValuation(),
+      ])
+        .then(([corr, val]) => {
+          if (cancelled) return;
+          setCorrData(corr);
+          setValData(val.sectors);
+          if (corr.sectors.length >= 2) {
+            setHexPair(`${corr.sectors[0]}-${corr.sectors[1]}`);
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, 0);
 
-  /* derived: all sector pairs */
-  const allPairs = useMemo(() => {
-    if (!corrData) return [];
-    const p: string[] = [];
-    const s = corrData.sectors;
-    for (let i = 0; i < s.length; i++)
-      for (let j = i + 1; j < s.length; j++)
-        p.push(`${s[i]}-${s[j]}`);
-    return p;
-  }, [corrData]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [period, weighting]);
 
   /* pairs grouped by correlation bucket */
   const groupedPairs = useMemo((): PairGroup[] => {
@@ -1053,7 +1055,6 @@ export default function SectorAnalysisPage() {
             <NormalizedPerformanceChart
               dailyReturns={corrData.dailyReturns}
               sectors={corrData.sectors}
-              period={corrData.period}
             />
 
             {/* Data coverage note */}
