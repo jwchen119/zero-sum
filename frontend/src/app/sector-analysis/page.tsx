@@ -859,14 +859,14 @@ export default function SectorAnalysisPage() {
           Sector Analysis
         </h1>
         <p className="mt-1 text-sm" style={{ color: T2, fontFamily: mono }}>
-          S&amp;P 500 cross-sector correlations, valuation signals, and hedging insights
+          Taiwan-market cross-sector correlations, valuation signals, and allocation insights
         </p>
         <HeavyRule />
 
         {/* Dataset metadata bar */}
         {corrData && !loading && (
           <div className="my-3 flex flex-wrap items-center gap-x-6 gap-y-1 border px-3 py-2 text-[11px]" style={{ fontFamily: mono, color: T2, borderColor: GRY, background: dark ? "#1a1a1a" : "#fafaf7" }}>
-            <span><strong style={{ color: INK }}>{corrData.totalStocksUsed}</strong> S&amp;P 500 stocks processed across <strong style={{ color: INK }}>{corrData.sectors.length}</strong> sectors</span>
+            <span><strong style={{ color: INK }}>{corrData.totalStocksUsed}</strong> Taiwan-market stocks processed across <strong style={{ color: INK }}>{corrData.sectors.length}</strong> sectors</span>
             <span><strong style={{ color: INK }}>{corrData.totalFilesInDataset}</strong> total tickers in dataset</span>
             {corrData.dataAsOf && <span>Data as of <strong style={{ color: INK }}>{corrData.dataAsOf}</strong></span>}
           </div>
@@ -901,14 +901,14 @@ export default function SectorAnalysisPage() {
         <p className="text-[10px] leading-snug -mt-2 mb-3" style={{ fontFamily: sans, color: TM, maxWidth: 680 }}>
           {weighting === "cap" ? (
             <><strong style={{ color: INK }}>Cap-Weight</strong> — larger companies move the sector more.
-            Matches how sector ETFs (XLK, XLV, XLE) actually behave, so correlations reflect
-            what you&apos;d experience when hedging with real instruments.
-            Downside: mega-caps like AAPL or NVDA can dominate an entire sector.
-            Based on all S&amp;P 500 constituents.</>
+            Similar to how broad Taiwan ETF exposures such as 0050.TW or sector-theme allocations behave,
+            so correlations better reflect what you&apos;d experience when allocating with Taiwan-heavy benchmarks.
+            Downside: heavyweights like 2330.TW or 2317.TW can dominate an entire sector.
+            Based on the project&apos;s Taiwan-oriented sector dataset.</>
           ) : (
             <><strong style={{ color: INK }}>Equal-Weight</strong> — every stock counts the same regardless of size.
-            Shows how the <em>typical</em> S&amp;P 500 stock in each sector performs, without mega-cap dominance.
-            Useful for spotting broad sector trends. Downside: doesn&apos;t match actual ETF behavior,
+            Shows how the <em>typical</em> Taiwan-market stock in each sector performs, without large-cap dominance.
+            Useful for spotting broad sector trends. Downside: it doesn&apos;t match how cap-weighted funds behave,
             so hedging correlations may differ from what you&apos;d see in practice.</>
           )}
         </p>
@@ -1007,8 +1007,8 @@ export default function SectorAnalysisPage() {
                 <ol className="list-decimal pl-4 mt-2 space-y-1.5">
                   <li>
                     <strong style={{ color: INK }}>Source data:</strong> We read daily closing prices for all{" "}
-                    <strong>{corrData.totalFilesInDataset}</strong> stocks in our dataset (S&amp;P 500 constituents). Each stock is
-                    tagged with its GICS sector (e.g. Technology, Healthcare, Energy).
+                    <strong>{corrData.totalFilesInDataset}</strong> stocks in our dataset (Taiwan-market sector constituents). Each stock is
+                    tagged with its sector classification (e.g. Technology, Healthcare, Energy).
                   </li>
                   <li>
                     <strong style={{ color: INK }}>Daily returns per stock:</strong> For each stock, we compute the daily percentage
@@ -1020,14 +1020,13 @@ export default function SectorAnalysisPage() {
                     <strong style={{ color: INK }}>{corrData.weighting === "cap" ? "Market-cap weighted" : "Equal-weight"} sector average:</strong>{" "}
                     {corrData.weighting === "cap" ? (
                       <>Within each sector, daily returns are averaged using <em>market capitalization as the weight</em>.
-                      A stock with $3T market cap contributes ~30× more than a stock with $100B market cap.
-                      This matches how sector ETFs (XLK, XLV, XLE, etc.) are constructed and reflects your actual
-                      exposure when trading sector funds. Correlations from cap-weighted returns are what you&apos;d
-                      actually experience when hedging with sector ETFs.</>
+                      A larger Taiwan heavyweight contributes materially more than a mid-cap name.
+                      This better matches how broad Taiwan allocations such as 0050.TW or sector-theme baskets behave
+                      and reflects the correlations you would feel in a size-sensitive portfolio.</>
                     ) : (
                       <>Within each sector, daily returns are averaged with <em>equal weight</em> — every stock counts
                       the same regardless of market capitalization. A $50B company and a $500B company contribute
-                      equally. This shows the performance of the &ldquo;typical stock&rdquo; in each sector, not dominated by mega-caps.</>
+                      equally. This shows the performance of the &ldquo;typical stock&rdquo; in each sector, not dominated by the largest names.</>
                     )}
                   </li>
                   <li>
@@ -1042,8 +1041,8 @@ export default function SectorAnalysisPage() {
                   <strong>What this means:</strong> Each line answers &ldquo;if I invested $100 in a {corrData.weighting === "cap" ? "cap-weighted" : "equal-weight"} portfolio
                   of each sector&apos;s stocks at the start of the period, what would it be worth today?&rdquo;{" "}
                   {corrData.weighting === "cap"
-                    ? "Because it is cap-weighted, this mirrors how sector ETFs actually behave — the correlations you see here are the correlations you'd experience when hedging with real sector instruments."
-                    : "Because it is equal-weight, the chart reflects the typical stock in each sector, not just the largest names."}{" "}
+                    ? "Because it is cap-weighted, it more closely reflects how broad Taiwan-market allocations behave in practice."
+                    : "Because it is equal-weight, the chart reflects the typical stock in each sector rather than only the largest names."}{" "}
                   Sectors above $100 outperformed;
                   sectors below $100 underperformed. Currently using <strong>{corrData.totalStocksUsed}</strong> stocks
                   across <strong>{corrData.sectors.length}</strong> sectors
@@ -1118,7 +1117,7 @@ export default function SectorAnalysisPage() {
             {hedgeRecommendations && (
               <>
                 <SectionHeader num={4} title="Hedging Insights"
-                  subtitle="Practical diversification takeaways based on correlation data." />
+                  subtitle="Practical diversification takeaways based on sector-correlation data." />
                 <div className="p-4 border mb-4" style={{ borderColor: GRY, background: dark ? "#1e1e1e" : "#faf8f3" }}>
                   <div className="mb-3">
                     <h4 className="text-[11px] font-bold uppercase tracking-wider mb-1" style={{ fontFamily: sans, color: dark ? "#66bb6a" : "#2e7d32" }}>
@@ -1233,7 +1232,7 @@ export default function SectorAnalysisPage() {
         {valData && !loading && (
           <>
             <SectionHeader num={7} title="Sector Valuation Scorecard"
-              subtitle="Compares current median P/E to historical norms. Signals whether sectors are cheap, fair, or expensive relative to their own history." />
+              subtitle="Compares current median P/E to historical norms. Signals whether sectors look inexpensive, fair, or expensive relative to their own history." />
 
             {/* Signal summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 my-4">
@@ -1334,7 +1333,7 @@ export default function SectorAnalysisPage() {
             </div>
 
             <p className="my-6 text-[10px] text-center" style={{ fontFamily: mono, color: TM }}>
-              Correlations computed from equal-weight sector daily returns. Valuation signals compare current median P/E to long-term sector norms. Past performance is not indicative of future results.
+              Correlations are computed from equal-weight sector daily returns. Valuation signals compare current median P/E to long-term sector norms. Past performance is not indicative of future results.
             </p>
           </>
         )}
