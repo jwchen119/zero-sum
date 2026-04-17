@@ -35,6 +35,11 @@ import {
 } from "@/lib/usePortfolioAlerts";
 import TickerAutocomplete from "@/components/TickerAutocomplete";
 import { DEFAULT_PORTFOLIO_BENCHMARK, PORTFOLIO_BENCHMARKS } from "@/lib/benchmarks";
+import {
+  DEFAULT_PORTFOLIO_SAMPLE_TICKER,
+  DEFAULT_PORTFOLIO_SECONDARY_SAMPLE_TICKER,
+  DEFAULT_PORTFOLIO_WHAT_IF_TICKER,
+} from "./portfolioDefaults";
 
 /* ????????????????????????????????????????????????????????????   Constants
    ????????????????????????????????????????????????????????????*/
@@ -1411,7 +1416,7 @@ export default function PortfolioPage() {
                 value={newTicker}
                 onChange={setNewTicker}
                 onAdd={(t) => { setNewTicker(t); setAddError(""); }}
-                placeholder="AAPL"
+                placeholder={DEFAULT_PORTFOLIO_SAMPLE_TICKER}
                 inputStyle={{ ...inputStyle, width: "100%" }}
                 inputClassName=""
               />
@@ -1495,7 +1500,7 @@ export default function PortfolioPage() {
                 <div>
                   <label style={{ fontFamily: sans, fontSize: 9, color: TM, textTransform: "uppercase", display: "block", marginBottom: 2 }}>Ticker</label>
                   <input value={alertTicker} onChange={e => setAlertTicker(e.target.value)}
-                    placeholder="AAPL" style={{ ...inputStyle, fontSize: 10, padding: "4px 6px", width: 70 }} />
+                    placeholder={DEFAULT_PORTFOLIO_SAMPLE_TICKER} style={{ ...inputStyle, fontSize: 10, padding: "4px 6px", width: 96 }} />
                 </div>
               )}
               <div>
@@ -1537,7 +1542,7 @@ export default function PortfolioPage() {
         {holdings.length === 0 && !analysis && (
           <div style={{ textAlign: "center", padding: "60px 20px", color: TM }}>
             <p style={{ fontFamily: serif, fontSize: 18, margin: "0 0 8px" }}>No holdings yet</p>
-            <p style={{ fontFamily: sans, fontSize: 12 }}>Add your first position above to start tracking. Try: AAPL, 10 shares, $150 cost basis.</p>
+            <p style={{ fontFamily: sans, fontSize: 12 }}>Add your first position above to start tracking. Try: {DEFAULT_PORTFOLIO_SAMPLE_TICKER}, 10 shares, $150 cost basis.</p>
           </div>
         )}
 
@@ -2205,7 +2210,7 @@ export default function PortfolioPage() {
               <h2 style={{ fontFamily: serif, fontSize: 16, fontWeight: 600, color: INK, margin: "0 0 10px" }}>What-If Scenario Simulator</h2>
               <p style={{ fontFamily: sans, fontSize: 11, color: TM, margin: "0 0 8px" }}>
                 Test hypothetical changes before trading. Add a new ticker, remove an existing holding, or change the share count ??                then compare projected Sharpe ratio, volatility, and return against your current portfolio. Helps answer questions like
-                &ldquo;What if I added 20 shares of AAPL?&rdquo; or &ldquo;How does dropping TSLA affect my risk?&rdquo;
+                &ldquo;What if I added 20 shares of {DEFAULT_PORTFOLIO_WHAT_IF_TICKER}?&rdquo; or &ldquo;How does dropping {DEFAULT_PORTFOLIO_SECONDARY_SAMPLE_TICKER} affect my risk?&rdquo;
               </p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginBottom: 10 }}>
                 <div>
@@ -2223,7 +2228,7 @@ export default function PortfolioPage() {
                     value={wiTicker}
                     onChange={setWiTicker}
                     onAdd={(t) => setWiTicker(t)}
-                    placeholder="NVDA"
+                    placeholder={DEFAULT_PORTFOLIO_WHAT_IF_TICKER}
                     inputStyle={{ ...inputStyle, width: "100%" }}
                     inputClassName=""
                   />
