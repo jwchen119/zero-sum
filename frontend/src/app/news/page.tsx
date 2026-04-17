@@ -12,8 +12,16 @@ import {
 } from "@/lib/wsj";
 import {
   fetchStockNews, type StockNewsArticle,
+  fetchStockNewsByKeyword,
   fetchStockNewsSummary, type StockNewsSummary,
 } from "@/lib/api";
+import {
+  buildNewsUrl,
+  DEFAULT_NEWS_KEYWORD_EXAMPLES,
+  DEFAULT_NEWS_TICKER_EXAMPLES,
+  getInitialNewsSearchState,
+  type NewsSearchMode,
+} from "./newsSearchMode";
 
 /* ── Source badge colors ── */
 const SOURCE_COLORS: Record<string, string> = {
@@ -51,10 +59,17 @@ function timeSince(dateStr: string): string {
 function StockNewsPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialTicker = searchParams.get("symbol")?.toUpperCase() || "";
+  const initialSearchState = getInitialNewsSearchState(searchParams);
 
-  const [ticker, setTicker] = useState(initialTicker);
-  const [inputVal, setInputVal] = useState(initialTicker);
+  const [mode, setMode] = useState<NewsSearchMode>(initialSearchState.mode);
+  const [tickerInput, setTickerInput] = useState(
+    initialSearchState.mode === "ticker" ? initialSearchState.query : "",
+  );
+  const [keywordInput, setKeywordInput] = useState(
+    initialSearchState.mode === "keyword" ? initialSearchState.query : "",
+  );
+  const [activeMode, setActiveMode] = useState<NewsSearchMode>(initialSearchState.mode);
+  const [activeQuery, setActiveQuery] = useState(initialSearchState.query);
   const [articles, setArticles] = useState<StockNewsArticle[]>([]);
   const [sources, setSources] = useState<string[]>([]);
   const [generatedAt, setGeneratedAt] = useState("");
@@ -67,17 +82,24 @@ function StockNewsPageInner() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState("");
 
-  const doFetch = (sym: string) => {
-    if (!sym) return;
-    const clean = sym.trim().toUpperCase();
-    if (!/^[A-Z0-9]{1,10}(\.[A-Z]{1,2})?$/.test(clean)) return;
-    setTicker(clean);
+  const beginFetch = (nextMode: NewsSearchMode, nextQuery: string) => {
+    setActiveMode(nextMode);
+    setActiveQuery(nextQuery);
     setLoading(true);
     setError("");
     setFilterSource(null);
     setSummary(null);
     setSummaryError("");
-    router.replace(`/news?symbol=${clean}`, { scroll: false });
+    router.replace(buildNewsUrl(nextMode, nextQuery), { scroll: false });
+  };
+
+  const doFetchTicker = (sym: string) => {
+    if (!sym) return;
+    const clean = sym.trim().toUpperCase();
+    if (!/^[A-Z0-9]{1,10}(\.[A-Z]{1,2})?$/.test(clean)) return;
+    setMode("ticker");
+    setTickerInput(clean);
+    beginFetch("ticker", clean);
     fetchStockNews(clean)
       .then((data) => {
         setArticles(data.articles || []);
@@ -88,8 +110,25 @@ function StockNewsPageInner() {
       .finally(() => setLoading(false));
   };
 
+  const doFetchKeyword = (rawKeyword: string) => {
+    if (!rawKeyword) return;
+    const clean = rawKeyword.trim().replace(/\s+/g, " ");
+    if (!clean) return;
+    setMode("keyword");
+    setKeywordInput(clean);
+    beginFetch("keyword", clean);
+    fetchStockNewsByKeyword(clean)
+      .then((data) => {
+        setArticles(data.articles || []);
+        setSources(data.sources || []);
+        setGeneratedAt(data.generatedAt || "");
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  };
+
   const doFetchSummary = (sym: string) => {
-    if (!sym || summaryLoading) return;
+    if (!sym || summaryLoading || activeMode !== "ticker") return;
     setSummaryLoading(true);
     setSummaryError("");
     fetchStockNewsSummary(sym)
@@ -99,18 +138,32 @@ function StockNewsPageInner() {
   };
 
   useEffect(() => {
-    if (initialTicker) doFetch(initialTicker);
+    if (!initialSearchState.query) return;
+    if (initialSearchState.mode === "keyword") {
+      doFetchKeyword(initialSearchState.query);
+      return;
+    }
+    doFetchTicker(initialSearchState.query);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    doFetch(inputVal);
+    if (mode === "keyword") {
+      doFetchKeyword(keywordInput);
+      return;
+    }
+    doFetchTicker(tickerInput);
   };
 
   const filtered = filterSource
     ? articles.filter((a) => a.source === filterSource)
     : articles;
+  const currentInput = mode === "keyword" ? keywordInput : tickerInput;
+  const loadingQuery = activeQuery || currentInput;
+  const quickExamples = mode === "keyword"
+    ? DEFAULT_NEWS_KEYWORD_EXAMPLES
+    : DEFAULT_NEWS_TICKER_EXAMPLES;
 
   const navContent = (
     <div className="flex items-center gap-4">
@@ -140,32 +193,79 @@ function StockNewsPageInner() {
         <HeavyRule />
 
         {/* Search bar */}
-        <form onSubmit={handleSubmit} className="flex items-center gap-3 mt-5 mb-6">
-          <div className="flex-1 max-w-xs">
-            <TickerAutocomplete
-              value={inputVal}
-              onChange={setInputVal}
-              onAdd={(t) => {
-                setInputVal(t);
-                doFetch(t);
-              }}
-              placeholder="Enter ticker (e.g. AAPL)…"
-              inputClassName="w-full"
-              inputStyle={{
-                fontFamily: mono,
-                fontSize: 14,
-                fontWeight: 700,
-                letterSpacing: "0.05em",
-                border: "2px solid #aaa",
-                padding: "10px 12px 10px 34px",
-                color: INK,
-                background: WHT,
-              }}
-            />
+        <div className="mt-5 mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMode("ticker")}
+            className="px-3 py-1.5 text-[11px] font-bold tracking-[0.18em] uppercase transition-colors"
+            style={{
+              fontFamily: sans,
+              background: mode === "ticker" ? INK : WHT,
+              color: mode === "ticker" ? WHT : INK,
+              border: `1.5px solid ${GRY}`,
+            }}
+          >
+            Ticker
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("keyword")}
+            className="px-3 py-1.5 text-[11px] font-bold tracking-[0.18em] uppercase transition-colors"
+            style={{
+              fontFamily: sans,
+              background: mode === "keyword" ? INK : WHT,
+              color: mode === "keyword" ? WHT : INK,
+              border: `1.5px solid ${GRY}`,
+            }}
+          >
+            Keyword (Beta)
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3 mb-2 sm:flex-row sm:items-center">
+          <div className="flex-1 max-w-xl">
+            {mode === "ticker" ? (
+              <TickerAutocomplete
+                value={tickerInput}
+                onChange={setTickerInput}
+                onAdd={(nextTicker) => {
+                  setTickerInput(nextTicker);
+                  doFetchTicker(nextTicker);
+                }}
+                placeholder="Enter Taiwan ticker (e.g. 2330.TW)…"
+                inputClassName="w-full"
+                inputStyle={{
+                  fontFamily: mono,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  letterSpacing: "0.05em",
+                  border: "2px solid #aaa",
+                  padding: "10px 12px 10px 34px",
+                  color: INK,
+                  background: WHT,
+                }}
+              />
+            ) : (
+              <input
+                type="text"
+                value={keywordInput}
+                onChange={(e) => setKeywordInput(e.target.value)}
+                placeholder="Enter keyword (beta, e.g. 台積電 or AI伺服器)…"
+                className="w-full focus:outline-none"
+                style={{
+                  fontFamily: sans,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  border: "2px solid #aaa",
+                  padding: "10px 12px",
+                  color: INK,
+                  background: WHT,
+                }}
+              />
+            )}
           </div>
           <button
             type="submit"
-            disabled={loading || !inputVal.trim()}
+            disabled={loading || !currentInput.trim()}
             className="px-5 py-2.5 font-bold text-sm tracking-widest uppercase transition-colors"
             style={{
               fontFamily: sans,
@@ -178,6 +278,11 @@ function StockNewsPageInner() {
             {loading ? "Loading…" : "Get News"}
           </button>
         </form>
+        {mode === "keyword" && (
+          <p className="mb-6 text-xs" style={{ fontFamily: mono, color: TM }}>
+            Keyword (Beta) uses free-text Google News search and accepts Chinese input. AI summary remains ticker-only for now.
+          </p>
+        )}
 
         {/* Error */}
         {error && (
@@ -190,20 +295,20 @@ function StockNewsPageInner() {
         {loading && (
           <div className="flex items-center justify-center py-16">
             <p className="animate-pulse text-lg" style={{ fontFamily: serif, color: TM }}>
-              Fetching news for {ticker}…
+              Fetching news for {loadingQuery}…
             </p>
           </div>
         )}
 
         {/* Results */}
-        {!loading && ticker && articles.length > 0 && (
+        {!loading && activeQuery && articles.length > 0 && (
           <>
             {/* Stats bar */}
             <div className="flex flex-wrap items-center gap-4 mb-4">
               <span className="text-sm" style={{ fontFamily: mono, color: T2 }}>
                 <strong style={{ color: INK }}>{filtered.length}</strong>{" "}
                 {filterSource ? `from ${filterSource}` : "articles"} for{" "}
-                <strong style={{ color: INK }}>{ticker}</strong>
+                <strong style={{ color: INK }}>{activeQuery}</strong>
               </span>
               {generatedAt && (
                 <span className="text-xs" style={{ fontFamily: mono, color: TM }}>
@@ -214,9 +319,9 @@ function StockNewsPageInner() {
 
             {/* ── AI News Summary Panel ── */}
             <div className="mb-6">
-              {!summary && !summaryLoading && !summaryError && (
+              {activeMode === "ticker" && !summary && !summaryLoading && !summaryError && (
                 <button
-                  onClick={() => doFetchSummary(ticker)}
+                  onClick={() => doFetchSummary(activeQuery)}
                   className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold tracking-wider uppercase transition-all hover:opacity-80"
                   style={{
                     fontFamily: sans,
@@ -240,17 +345,17 @@ function StockNewsPageInner() {
                   <div className="flex items-center gap-3">
                     <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: `${INK} transparent ${INK} ${INK}` }} />
                     <span className="text-sm animate-pulse" style={{ fontFamily: serif, color: TM }}>
-                      Analyzing {articles.length} articles for {ticker}… extracting content &amp; generating AI summary
+                      Analyzing {articles.length} articles for {activeQuery}… extracting content &amp; generating AI summary
                     </span>
                   </div>
                 </div>
               )}
 
-              {summaryError && (
+              {activeMode === "ticker" && summaryError && (
                 <div className="p-4 border flex items-center justify-between" style={{ borderColor: LOSS, background: "rgba(198, 40, 40, 0.05)" }}>
                   <span className="text-sm" style={{ fontFamily: mono, color: LOSS }}>{summaryError}</span>
                   <button
-                    onClick={() => doFetchSummary(ticker)}
+                    onClick={() => doFetchSummary(activeQuery)}
                     className="text-xs font-bold uppercase tracking-wider px-3 py-1"
                     style={{ fontFamily: sans, color: INK, border: `1px solid ${GRY}` }}
                   >
@@ -259,7 +364,15 @@ function StockNewsPageInner() {
                 </div>
               )}
 
-              {summary && !summaryLoading && (
+              {activeMode === "keyword" && (
+                <div className="border px-4 py-3" style={{ borderColor: GRY, background: "rgba(0,0,0,0.02)" }}>
+                  <p className="text-xs" style={{ fontFamily: mono, color: TM }}>
+                    Keyword (Beta) currently returns article lists only. AI summary remains available in ticker mode.
+                  </p>
+                </div>
+              )}
+
+              {activeMode === "ticker" && summary && !summaryLoading && (
                 <div className="border" style={{ borderColor: GRY }}>
                   {/* Sentiment header */}
                   {(() => {
@@ -487,33 +600,40 @@ function StockNewsPageInner() {
         )}
 
         {/* Empty state */}
-        {!loading && ticker && articles.length === 0 && !error && (
+        {!loading && activeQuery && articles.length === 0 && !error && (
           <div className="text-center py-16">
             <p className="text-lg mb-2" style={{ fontFamily: serif, color: TM }}>
-              No news found for <strong>{ticker}</strong>
+              No news found for <strong>{activeQuery}</strong>
             </p>
             <p className="text-sm" style={{ fontFamily: mono, color: TM }}>
-              Try a different ticker or check back later
+              {activeMode === "keyword" ? "Try a broader keyword or check back later" : "Try a different ticker or check back later"}
             </p>
           </div>
         )}
 
         {/* Initial state */}
-        {!loading && !ticker && !error && (
+        {!loading && !activeQuery && !error && (
           <div className="text-center py-16">
             <p className="text-lg mb-2" style={{ fontFamily: serif, color: TM }}>
-              Enter a ticker symbol above to get started
+              {mode === "keyword" ? "Enter a keyword above to test beta news search" : "Enter a Taiwan ticker symbol above to get started"}
             </p>
             <p className="text-sm" style={{ fontFamily: mono, color: TM }}>
-              News aggregated from Google News RSS, Yahoo Finance RSS, and yfinance
+              {mode === "keyword"
+                ? "Keyword mode currently searches Google News and accepts Chinese input"
+                : "News aggregated from Google News RSS, Yahoo Finance RSS, and yfinance"}
             </p>
             <div className="flex justify-center gap-3 mt-6 flex-wrap">
-              {["AAPL", "MSFT", "NVDA", "GOOG", "TSLA", "AMZN"].map((t) => (
+              {quickExamples.map((example) => (
                 <button
-                  key={t}
+                  key={example}
                   onClick={() => {
-                    setInputVal(t);
-                    doFetch(t);
+                    if (mode === "keyword") {
+                      setKeywordInput(example);
+                      doFetchKeyword(example);
+                      return;
+                    }
+                    setTickerInput(example);
+                    doFetchTicker(example);
                   }}
                   className="px-4 py-2 text-sm font-bold tracking-widest transition-colors hover:opacity-80"
                   style={{
@@ -523,7 +643,7 @@ function StockNewsPageInner() {
                     background: WHT,
                   }}
                 >
-                  {t}
+                  {example}
                 </button>
               ))}
             </div>

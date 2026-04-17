@@ -512,6 +512,22 @@ export async function fetchStockNews(ticker: string): Promise<StockNewsResponse>
   return res.json();
 }
 
+export interface KeywordNewsResponse {
+  query: string;
+  articles: StockNewsArticle[];
+  sources: string[];
+  generatedAt: string;
+}
+
+export async function fetchStockNewsByKeyword(keyword: string): Promise<KeywordNewsResponse> {
+  const res = await fetch(`${API_BASE}/api/stock-news-keyword?keyword=${encodeURIComponent(keyword)}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `Failed to fetch keyword news (${res.status})`);
+  }
+  return res.json();
+}
+
 /* ─── Stock News AI Summary ─── */
 
 export interface StockNewsSummary {
